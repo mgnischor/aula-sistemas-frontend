@@ -1,0 +1,38 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# GitHub Actions workflows
+.github/workflows/*.yml text eol=lf
+
+# Source code
+*.ts text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Configuration files
+*.yml text eol=lf
+*.yaml text eol=lf
+.editorconfig text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Documentation
+*.txt text eol=lf
+LICENSE text eol=lf
+README* text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.svg binary
