@@ -2,6 +2,26 @@
 
 Este guia explica como criar releases do projeto usando os workflows do GitHub Actions.
 
+## 📦 O que é incluído no Release
+
+Cada release inclui automaticamente:
+
+### Arquivos de Build
+
+-   **`aula-sistemas-frontend-vX.Y.Z.tar.gz`** - Build compactado (Linux/Mac)
+-   **`aula-sistemas-frontend-vX.Y.Z.zip`** - Build compactado (Windows)
+-   **`3rdpartylicenses.txt`** - Licenças de dependências
+-   **`prerendered-routes.json`** - Rotas pré-renderizadas
+
+### Informações da Release
+
+-   ✅ Tamanho do build
+-   ✅ Número de arquivos
+-   ✅ Versão do Angular
+-   ✅ Data do build
+-   ✅ Changelog automático
+-   ✅ Instruções de deploy
+
 ## Pré-requisitos
 
 -   Acesso de push ao repositório
@@ -63,6 +83,23 @@ git push origin --tags
 -   Acesse **Actions** no GitHub para acompanhar o progresso
 -   Quando concluído, a release estará disponível em **Releases**
 
+### 6. Verifique a Release
+
+Quando o workflow concluir, a release incluirá:
+
+```
+📦 Release v1.0.0
+├── 📄 aula-sistemas-frontend-v1.0.0.tar.gz (build completo - Linux/Mac)
+├── 📄 aula-sistemas-frontend-v1.0.0.zip (build completo - Windows)
+├── 📄 3rdpartylicenses.txt (licenças de dependências)
+├── 📄 prerendered-routes.json (rotas pré-renderizadas)
+└── 📝 Release notes com:
+    ├── Tamanho do build
+    ├── Número de arquivos
+    ├── Changelog automático
+    └── Instruções de deploy
+```
+
 ## Tipos de Versão
 
 ### Semantic Versioning (MAJOR.MINOR.PATCH)
@@ -106,41 +143,86 @@ git push origin --tags
 
 ## O que acontece no workflow de Release?
 
-1. ✅ Executa todos os testes
-2. 🏗️ Build de produção
-3. 📦 Cria tarball compactado
-4. 📝 Gera changelog automático dos commits
-5. 🚀 Cria GitHub Release
-6. 📤 Upload de artefatos
+1. ✅ Executa todos os testes unitários
+2. 🏗️ Build de produção otimizado
+3. � Coleta informações do build (tamanho, arquivos)
+4. 📦 Cria múltiplos formatos:
+    - `.tar.gz` para Linux/Mac
+    - `.zip` para Windows
+5. 📝 Gera changelog automático dos commits
+6. � Copia arquivos adicionais (licenças, rotas)
+7. �🚀 Cria GitHub Release com todos os artefatos
+8. 📤 Upload automático de todos os arquivos
 
-## Conteúdo da Release
+## Como usar os arquivos da Release
 
-Cada release incluirá:
+### Download e Deploy
 
--   **Tarball**: `aula-sistemas-frontend-vX.Y.Z.tar.gz` (build compilado)
--   **Changelog**: Gerado automaticamente dos commits
--   **Artefatos**: Build completo disponível para download
--   **Release notes**: Gerado pelo GitHub com base nos PRs merged
-
-## Verificando uma Release
-
-Após a release ser criada:
-
-1. Vá para **Releases** no GitHub
-2. A release deve estar listada com a tag
-3. Baixe o tarball para testar:
+**Linux/Mac:**
 
 ```bash
-# Baixe o tarball
+# Baixar
 wget https://github.com/mgnischor/aula-sistemas-frontend/releases/download/v1.0.0/aula-sistemas-frontend-v1.0.0.tar.gz
 
-# Extraia
+# Extrair
 tar -xzf aula-sistemas-frontend-v1.0.0.tar.gz
 
-# Sirva localmente para testar (exemplo com Python)
-cd dist
+# Deploy em servidor web
+sudo cp -r * /var/www/html/
+
+# Ou servir localmente
 python -m http.server 8080
+# Acesse: http://localhost:8080
 ```
+
+**Windows:**
+
+```powershell
+# Baixar o arquivo .zip do GitHub Releases
+
+# Extrair
+Expand-Archive -Path aula-sistemas-frontend-v1.0.0.zip -DestinationPath C:\inetpub\wwwroot\
+
+# Ou servir localmente com Node.js
+npx http-server . -p 8080
+# Acesse: http://localhost:8080
+```
+
+### Opções de Servidor Web
+
+**Apache:**
+
+```bash
+# Copiar para diretório do Apache
+sudo cp -r * /var/www/html/myapp/
+sudo systemctl reload apache2
+```
+
+**Nginx:**
+
+```bash
+# Copiar para diretório do Nginx
+sudo cp -r * /usr/share/nginx/html/myapp/
+sudo nginx -s reload
+```
+
+**Docker:**
+
+```dockerfile
+FROM nginx:alpine
+COPY aula-sistemas-frontend-v1.0.0/ /usr/share/nginx/html/
+EXPOSE 80
+```
+
+### Verificação da Release
+
+Após deploy, verifique:
+
+1. ✅ Todos os arquivos foram extraídos
+2. ✅ `index.html` está acessível
+3. ✅ Assets (JS, CSS) estão carregando
+4. ✅ Favicon aparece corretamente
+5. ✅ Rotas funcionam (se usar routing)
 
 ## Corrigindo Erros
 

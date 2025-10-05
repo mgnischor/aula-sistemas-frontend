@@ -38,43 +38,125 @@ jobs:
       - name: Build for production
         run: pnpm run build:production
 
-      - name: Create tarball of build artifacts
+      - name: Get build information
+        id: build_info
         run: |
-          cd dist
-          tar -czf ../aula-sistemas-frontend-${{ github.ref_name }}.tar.gz .
-          cd ..
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # Extract version from tag
           VERSION=${GITHUB_REF#refs/tags/}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          # Generate simple changelog from commits since last tag
+          # Get build size
+          BUILD_SIZE=$(du -sh dist/aula-sistemas-frontend/browser | cut -f1)
+          echo "build_size=$BUILD_SIZE" >> $GITHUB_OUTPUT
+
+          # Count files
+          FILE_COUNT=$(find dist/aula-sistemas-frontend/browser -type f | wc -l)
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Create release artifacts
+        run: |
+          VERSION=${{ steps.build_info.outputs.version }}
+
+          # Create directory for release files
+          mkdir -p release-files
+
+          # 1. Create tarball (tar.gz) - Linux/Mac friendly
+          cd dist/aula-sistemas-frontend/browser
+          tar -czf ../../../release-files/aula-sistemas-frontend-${VERSION}.tar.gz .
+          cd ../../..
+
+          # 2. Create zip file - Windows friendly
+          cd dist/aula-sistemas-frontend/browser
+          zip -r ../../../release-files/aula-sistemas-frontend-${VERSION}.zip .
+          cd ../../..
+
+          # 3. Copy additional files to release
+          cp dist/aula-sistemas-frontend/3rdpartylicenses.txt release-files/ || true
+          cp dist/aula-sistemas-frontend/prerendered-routes.json release-files/ || true
+
+          # List release files
+          echo "Release files created:"
+          ls -lh release-files/
+
+      - name: Generate changelog and release notes
+        id: changelog
+        run: |
+          VERSION=${{ steps.build_info.outputs.version }}
+          BUILD_SIZE=${{ steps.build_info.outputs.build_size }}
+          FILE_COUNT=${{ steps.build_info.outputs.file_count }}
+
+          # Generate changelog from commits
           PREV_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
 
+          # Create release notes
+          cat > RELEASE_NOTES.md << EOF
+          ## 📦 Release ${VERSION}
+
+          ### 🚀 Build Information
+          - **Build Size**: ${BUILD_SIZE}
+          - **Files**: ${FILE_COUNT}
+          - **Angular Version**: 20.3.0
+          - **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          ### 📥 Download Options
+          - **\`aula-sistemas-frontend-${VERSION}.tar.gz\`** - Compressed tarball (Linux/Mac)
+          - **\`aula-sistemas-frontend-${VERSION}.zip\`** - ZIP archive (Windows)
+
+          ### 🔧 How to Deploy
+
+          **Option 1: Extract and serve with a web server**
+          \`\`\`bash
+          # Extract (tar.gz)
+          tar -xzf aula-sistemas-frontend-${VERSION}.tar.gz -C /var/www/html/
+
+          # Or extract (zip)
+          unzip aula-sistemas-frontend-${VERSION}.zip -d /var/www/html/
+          \`\`\`
+
+          **Option 2: Serve locally for testing**
+          \`\`\`bash
+          # Using Python
+          python -m http.server 8080
+
+          # Using Node.js http-server
+          npx http-server . -p 8080
+
+          # Using PHP
+          php -S localhost:8080
+          \`\`\`
+
+          ### 📝 What's Changed
+
+          EOF
+
+          # Add commit changelog
           if [ -z "$PREV_TAG" ]; then
-            echo "## What's Changed" > CHANGELOG.md
-            git log --pretty=format:"- %s (%h)" >> CHANGELOG.md
+            git log --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
           else
-            echo "## What's Changed" > CHANGELOG.md
-            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> CHANGELOG.md
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}" >> RELEASE_NOTES.md
           fi
 
-          echo "" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}" >> CHANGELOG.md
+          echo "" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "---" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### 📚 Documentation" >> RELEASE_NOTES.md
+          echo "- [Setup Guide](https://github.com/${{ github.repository }}/blob/main/docs/SETUP.md)" >> RELEASE_NOTES.md
+          echo "- [Usage Guide](https://github.com/${{ github.repository }}/blob/main/docs/USAGE.md)" >> RELEASE_NOTES.md
+          echo "- [Architecture](https://github.com/${{ github.repository }}/blob/main/docs/ARCHITECTURE.md)" >> RELEASE_NOTES.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            aula-sistemas-frontend-${{ github.ref_name }}.tar.gz
-          body_path: CHANGELOG.md
+            release-files/*
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
