@@ -22,32 +22,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint check (if configured)
         run: |
           if grep -q '"lint"' package.json; then
-            npm run lint
+            pnpm run lint
           else
             echo "No lint script found, skipping..."
           fi
         continue-on-error: true
 
       - name: Run tests
-        run: npm test -- --watch=false --browsers=ChromeHeadless
+        run: pnpm test -- --watch=false --browsers=ChromeHeadless
 
       - name: Build for development
-        run: npm run build:development
+        run: pnpm run build:development
 
       - name: Build for production
-        run: npm run build:production
+        run: pnpm run build:production
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -65,17 +70,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: npm test -- --watch=false --browsers=ChromeHeadless --code-coverage
+        run: pnpm test -- --watch=false --browsers=ChromeHeadless --code-coverage
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4

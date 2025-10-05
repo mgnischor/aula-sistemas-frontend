@@ -1,128 +1,138 @@
 name: Release - Build & Deploy
 
 on:
-    push:
-        tags:
-            - "v*.*.*" # Triggers on version tags like v1.0.0, v2.1.3, etc.
+  push:
+    tags:
+      - "v*.*.*" # Triggers on version tags like v1.0.0, v2.1.3, etc.
 
 permissions:
-    contents: write
+  contents: write
 
 jobs:
-    create-release:
-        runs-on: ubuntu-latest
+  create-release:
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0 # Fetch all history for proper changelog generation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for proper changelog generation
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20.x
-                  cache: "npm"
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "pnpm"
 
-            - name: Run tests
-              run: npm test -- --watch=false --browsers=ChromeHeadless
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-            - name: Build for production
-              run: npm run build:production
+      - name: Run tests
+        run: pnpm test -- --watch=false --browsers=ChromeHeadless
 
-            - name: Create tarball of build artifacts
-              run: |
-                  cd dist
-                  tar -czf ../aula-sistemas-frontend-${{ github.ref_name }}.tar.gz .
-                  cd ..
+      - name: Build for production
+        run: pnpm run build:production
 
-            - name: Generate changelog
-              id: changelog
-              run: |
-                  # Extract version from tag
-                  VERSION=${GITHUB_REF#refs/tags/}
-                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Create tarball of build artifacts
+        run: |
+          cd dist
+          tar -czf ../aula-sistemas-frontend-${{ github.ref_name }}.tar.gz .
+          cd ..
 
-                  # Generate simple changelog from commits since last tag
-                  PREV_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-                  if [ -z "$PREV_TAG" ]; then
-                    echo "## What's Changed" > CHANGELOG.md
-                    git log --pretty=format:"- %s (%h)" >> CHANGELOG.md
-                  else
-                    echo "## What's Changed" > CHANGELOG.md
-                    git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> CHANGELOG.md
-                  fi
+          # Generate simple changelog from commits since last tag
+          PREV_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
 
-                  echo "" >> CHANGELOG.md
-                  echo "" >> CHANGELOG.md
-                  echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}" >> CHANGELOG.md
+          if [ -z "$PREV_TAG" ]; then
+            echo "## What's Changed" > CHANGELOG.md
+            git log --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          else
+            echo "## What's Changed" > CHANGELOG.md
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          fi
 
-            - name: Create GitHub Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: |
-                      aula-sistemas-frontend-${{ github.ref_name }}.tar.gz
-                  body_path: CHANGELOG.md
-                  draft: false
-                  prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-                  generate_release_notes: true
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}" >> CHANGELOG.md
 
-            - name: Upload build artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: production-build-${{ github.ref_name }}
-                  path: dist/
-                  retention-days: 90
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            aula-sistemas-frontend-${{ github.ref_name }}.tar.gz
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # Job opcional: deploy para GitHub Pages (se desejado)
-    deploy-to-pages:
-        runs-on: ubuntu-latest
-        needs: create-release
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build-${{ github.ref_name }}
+          path: dist/
+          retention-days: 90
 
-        # Uncomment if you want to deploy to GitHub Pages
-        # permissions:
-        #   contents: read
-        #   pages: write
-        #   id-token: write
+  # Job opcional: deploy para GitHub Pages (se desejado)
+  deploy-to-pages:
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    # Uncomment if you want to deploy to GitHub Pages
+    # permissions:
+    #   contents: read
+    #   pages: write
+    #   id-token: write
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20.x
-                  cache: "npm"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
 
-            - name: Build for production
-              run: npm run build:production
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "pnpm"
 
-            # Uncomment the following steps to enable GitHub Pages deployment
-            # - name: Setup Pages
-            #   uses: actions/configure-pages@v4
-            #
-            # - name: Upload artifact
-            #   uses: actions/upload-pages-artifact@v3
-            #   with:
-            #     path: 'dist/aula-sistemas-frontend/browser'
-            #
-            # - name: Deploy to GitHub Pages
-            #   id: deployment
-            #   uses: actions/deploy-pages@v4
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-            - name: Deployment info
-              run: |
-                  echo "✅ Release created successfully!"
-                  echo "📦 Build artifacts uploaded"
-                  echo "🚀 To enable GitHub Pages deployment, uncomment the steps in this workflow"
+      - name: Build for production
+        run: pnpm run build:production
+
+      # Uncomment the following steps to enable GitHub Pages deployment
+      # - name: Setup Pages
+      #   uses: actions/configure-pages@v4
+      #
+      # - name: Upload artifact
+      #   uses: actions/upload-pages-artifact@v3
+      #   with:
+      #     path: 'dist/aula-sistemas-frontend/browser'
+      #
+      # - name: Deploy to GitHub Pages
+      #   id: deployment
+      #   uses: actions/deploy-pages@v4
+
+      - name: Deployment info
+        run: |
+          echo "✅ Release created successfully!"
+          echo "📦 Build artifacts uploaded"
+          echo "🚀 To enable GitHub Pages deployment, uncomment the steps in this workflow"
